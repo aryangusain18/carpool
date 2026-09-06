@@ -1,37 +1,48 @@
-# Report — DA5401 Assignment 2
+# DA5401 — Assignment 3 — Report
 
-## Problem 1: Predicting Maintenance Job Cost
+**Roll number:** DA26M002
 
-**Cross-validation (training data only, 5 folds):** Mean Absolute Error (MAE),the average dollar amount by which predictions miss the actual cost, came out to **$646.34** on average across the 5 folds, with a standard deviation of **$37.53**. That's a fairly tight spread, suggesting the model performs consistently regardless of which slice of the training data it sees.
+## Problem 1 — Decision Tree Classifier from Scratch
 
-**Performance on the held-out test set** (data the model never touched during training or tuning):
+**split_seed:** 2 *(last two digits of roll number DA26M002)*
 
-- MAE: **$663.07** — on average, the model's cost estimate is off by about $663.
-- RMSE: **$866.71** — a bit higher than MAE, which tells us a handful of jobs have noticeably larger errors than the "typical" job.
-- MAPE: **0.0959**, i.e. roughly a 9.6% error relative to the actual job cost.
-- R²: **0.8359** — the model explains about 84% of the variation in job cost across jobs.
+| max_depth | train_accuracy | validation_accuracy |
+|:---------:|:---------------:|:--------------------:|
+| 1 | 0.6490 | 0.5333 |
+| 2 | 0.6592 | 0.5238 |
+| 3 | 0.6939 | 0.5905 |
+| 4 | 0.7429 | 0.6571 |
+| 5 | 0.7837 | 0.6571 |
+| 6 | 0.8347 | 0.6381 |
 
-**Which single metric best fits this use case?** I'd pick **MAE** as the primary business metric. These predictions exist to help with budgeting, so the most useful number is one expressed directly in the currency being budgeted, and MAE gives exactly that: "expect to be off by about $663 per job, on average." Because it doesn't square the errors the way RMSE does, MAE also isn't thrown off by a few unusually expensive jobs, it reflects *typical* performance rather than being dragged around by outliers, which matters more for planning across a whole portfolio of jobs than for any single worst case. MAPE is a useful sanity check when comparing across job sizes, but a percentage isn't something you can directly put into a budget line, and R² is more of a "how good is the model overall" statistic than something a planner can act on.
+- **underfit_depth:** 1
+- **overfit_depth:** 6
+- **best_depth:** 4
+- **Final test accuracy (depth = 4, trained on combined train+validation data):** 0.6381
 
-## Problem 2: Predicting Critical Machine Failure Within 30 Days
+**Interpretation:** At depth 1 the tree is too simple to capture the structure in the data, so both training and validation accuracy are low and close together — the classic signature of underfitting. As depth increases, training accuracy climbs steadily (up to 0.835 at depth 6), but validation accuracy peaks around depth 4–5 and then falls at depth 6, so the train–validation gap widens to its largest value (0.197) at depth 6 — the tree is starting to fit noise specific to the training set rather than the underlying pattern. Depth 4 is selected as the best depth because it matches the peak validation accuracy of depth 5 with a shallower, less complex tree.
 
-Because failing to catch a machine that's actually about to break down is costly, the business set a hard requirement: the chosen decision threshold must catch **at least 85% of real failures** (recall ≥ 0.85) on the validation data, and among thresholds that clear that bar, we pick whichever gives the best precision (fewest false alarms).
+## Problem 2 — Random Forest Regression
 
-**Threshold selection (using the validation set only):**
-- Selected threshold: **0.1115**
-- Precision at this threshold: **0.3267**
-- Recall at this threshold: **0.8684**
+**split_seed:** 2 *(same derivation — last two digits of roll number DA26M002)*
 
-**Final evaluation on the untouched test set,** after refitting the model on training + validation data and applying that fixed threshold:
+**5-fold cross-validation MAE (training set only):**
 
-- TN (correctly predicted no failure): **191**
-- FP (predicted failure, but machine was fine): **72**
-- FN (predicted no failure, but machine actually failed): **8**
-- TP (correctly predicted failure): **29**
-- Accuracy: **0.7333**
-- Precision: **0.2871**
-- Recall: **0.7838**
-- Specificity: **0.7262**
-- F1 score: **0.4203**
+| Model | mean CV MAE | std CV MAE |
+|:---|:---:|:---:|
+| Single tree (baseline) | 11.2171 | 0.6284 |
+| Random Forest, n_estimators=10 | 8.1338 | 0.6063 |
+| Random Forest, n_estimators=50 | 7.6691 | 0.5279 |
+| Random Forest, n_estimators=100 | 7.5332 | 0.5710 |
+| Random Forest, n_estimators=200 | 7.5568 | 0.5883 |
 
-**Did this generalise well?** Reasonably, but not perfectly. Test recall (0.78) came in below both the validation recall (0.87) and the 0.85 target. That's not a sign of a broken model, though with only around 37 machines that actually failed in each of the validation and test sets, recall estimates near a decision boundary are naturally a bit noisy; missing just one or two more failures than expected is enough to produce a gap this size. Precision, meanwhile, held up fairly close to its validation value (0.287 vs 0.327), suggesting the model's underlying behaviour is stable and the recall dip is mostly a small-sample effect rather than a fundamental mismatch between the validation and test data. If this were going into production, a small safety margin picking a threshold that clears, say, 0.90 recall on validation would make the 0.85 guarantee hold up more reliably on new data.
+- **Selected n_estimators:** 100 *(lowest mean CV MAE)*
+
+**Test-set performance (held-out 20%, evaluated once):**
+
+| Model | MAE | RMSE | R² |
+|:---|:---:|:---:|:---:|
+| Single tree (baseline) | 11.5883 | 14.6317 | 0.1059 |
+| Random Forest (n_estimators=100) | 7.4563 | 9.3880 | 0.6319 |
+
+**Interpretation:** A single, unpruned decision tree fits perfectly to whatever training fold it sees and overfits the noise in that fold, which is why its cross-validation MAE (11.22 hours) is far higher than every Random Forest setting and its test R² (0.106) explains only a small fraction of the variance in maintenance duration. Averaging over 100 randomized, bootstrap-sampled trees cancels out much of that overfitting: test MAE falls from 11.59 to 7.46 hours and R² rises to 0.632. The fold-to-fold standard deviation of CV MAE is somewhat lower for the forest (0.57) than the tree (0.63), but the larger effect by far is the drop in average error rather than in fold-to-fold variability.
