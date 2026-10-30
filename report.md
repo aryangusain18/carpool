@@ -1,113 +1,126 @@
-# Problem 1 — XGBoost Regression
+# DA5401 — Assignment 6 Report
 
-**Split seed:** 2
-
-**Training and validation RMSE for every supplied number of estimators**
-(`max_depth=3`, `learning_rate=0.1`)
-
-| n_estimators | Train RMSE | Validation RMSE |
-|---:|---:|---:|
-| 1   | 75.7790 | 78.1399 |
-| 10  | 51.8733 | 55.7710 |
-| 25  | 37.2551 | 43.6579 |
-| 50  | 27.8817 | 35.6849 |
-| 100 | 22.5167 | 31.3319 |
-| 200 | 19.9015 | 30.3118 |
-
-**Selected number of estimators:** 200 (lowest validation RMSE = 30.3118)
-
-**Validation RMSE — full sampling vs. subsampling** (at n_estimators = 200)
-
-| Configuration | subsample | colsample_bytree | Validation RMSE |
-|---|---:|---:|---:|
-| Full sampling | 1.0 | 1.0 | 30.3118 |
-| Subsampled    | 0.8 | 0.8 | 30.1762 |
-
-**Selected sampling configuration:** Subsampled (subsample=0.8, colsample_bytree=0.8)
-
-**Final test metrics** (refit on combined train+validation, evaluated once on test)
-
-| MAE | RMSE | R² |
-|---:|---:|---:|
-| 21.8532 | 28.3057 | 0.8653 |
-
-**Top five features by weight, gain, and cover**
-
-| Rank | Weight | Gain | Cover |
-|---:|---|---|---|
-| 1 | production_rate_tph (220) | production_rate_tph (179253.22) | shift_index (1434.79) |
-| 2 | ambient_temp_c (179) | feed_moisture_pct (50557.36) | production_rate_tph (1012.10) |
-| 3 | feed_moisture_pct (166) | ambient_temp_c (44958.94) | downtime_hours (965.35) |
-| 4 | vibration_mm_s (160) | equipment_age_years (21868.21) | feed_moisture_pct (930.61) |
-| 5 | equipment_age_years (159) | vibration_mm_s (21585.48) | noise_sensor_1 (900.26) |
-
-**Observations on the three feature-importance rankings**
-
-Weight and gain agree almost exactly at the top: `production_rate_tph` ranks first under both, and the same five features fill both top-5 lists, only reordered. Cover tells a different story , `shift_index`, ranked last (11th) by weight and 6th by gain, ranks 1st by cover, because its few splits each partition a very large share of the training rows. `noise_sensor_1`, essentially uncorrelated with the target, ranks 5th by cover while ranking 10th (weight) and last (gain), showing cover reflects how much data passes through a feature's splits rather than how useful those splits are.
+**Name:** Aryan Gusain  **Roll No.:** DA26M002  **student_seed:** 2 (last two digits of roll number)
 
 ---
 
-# Problem 2 — CatBoost Classification
+## Problem 1 — Density-Based Clustering (DBSCAN and HDBSCAN)
 
-**Split seed:** 2
+Features were standardized with `StandardScaler`. The dataset has 2450 points. The silhouette score is computed on non-noise points only. Noise fraction is noise points divided by 2450.
 
-**Cardinalities of the categorical predictors**
+### DBSCAN (Euclidean distance)
 
-| Column | Unique categories |
-|---|---:|
-| city | 40 |
-| branch | 150 |
-| sales_agent | 250 |
-| occupation | 10 |
-| customer_segment | 4 |
-| channel | 4 |
-| product_family | 5 |
-| region | 5 |
+| eps | min_samples | Clusters | Noise fraction | Cluster sizes | Silhouette |
+|---|---|---|---|---|---|
+| 0.12 | 5 | 4 | 0.0792 | [340, 472, 491, 953] | 0.5169 |
+| 0.18 | 5 | 5 | 0.0641 | [5, 7, 478, 492, 1311] | 0.2680 |
+| 0.24 | 8 | 3 | 0.0559 | [490, 495, 1328] | 0.4918 |
+| 0.30 | 10 | 4 | 0.0445 | [10, 493, 500, 1338] | 0.4010 |
 
-**Validation ROC-AUC and F1 for every supplied CatBoost configuration** (`depth=6`)
+**Selected DBSCAN configuration:** `eps = 0.12`, `min_samples = 5` (highest silhouette, 0.5169).
 
-| Config | Iterations | Learning Rate | Validation ROC-AUC | Validation F1 |
-|---|---:|---:|---:|---:|
-| A | 50  | 0.20 | 0.6199 | 0.0672 |
-| B | 150 | 0.08 | 0.6184 | 0.0179 |
-| C | 400 | 0.03 | 0.6074 | 0.0174 |
+### HDBSCAN (`min_samples=None`, `metric="euclidean"`)
 
-**Selected configuration:** A (iterations=50, learning_rate=0.20, depth=6) — highest validation ROC-AUC
+| min_cluster_size | Clusters | Noise fraction | Cluster sizes | Silhouette |
+|---|---|---|---|---|
+| 20 | 4 | 0.0763 | [337, 481, 495, 950] | 0.5159 |
+| 40 | 3 | 0.0669 | [475, 495, 1316] | 0.4969 |
+| 70 | 3 | 0.0718 | [474, 495, 1305] | 0.5001 |
+| 100 | 3 | 0.0804 | [473, 494, 1286] | 0.5062 |
 
-**Final test evaluation** (refit on combined train+validation, evaluated once on test)
+**Selected HDBSCAN configuration:** `min_cluster_size = 20` (highest silhouette, 0.5159).
 
-Confusion matrix:
+### Selected solutions
 
-| | Predicted 0 | Predicted 1 |
-|---|---:|---:|
-| **Actual 0** | TN = 337 | FP = 3 |
-| **Actual 1** | FN = 108 | TP = 2 |
+| Method | Configuration | Clusters | Cluster sizes | Noise fraction | Silhouette |
+|---|---|---|---|---|---|
+| DBSCAN | eps = 0.12, min_samples = 5 | 4 | [340, 472, 491, 953] | 0.0792 | 0.5169 |
+| HDBSCAN | min_cluster_size = 20 | 4 | [337, 481, 495, 950] | 0.0763 | 0.5159 |
 
-| Accuracy | Precision | Recall | F1 | ROC-AUC |
-|---:|---:|---:|---:|---:|
-| 0.7533 | 0.4000 | 0.0182 | 0.0348 | 0.6446 |
+---
 
-**Observations based on the computed ordered encodings and categorical cardinalities**
+## Problem 2 — Random Forest Hyperparameter Tuning
 
-Naive target encoding is leaky by construction.Every row of a category receives that category's own overall response rate (computed using the row's own label) giving a relatively tight per-column spread (std 0.016–0.119 across the eight columns); ordered encoding is consistently more spread out (std 0.038–0.163) because each row only sees the category's history up to that point rather than the full-sample average. Cardinality controls how often that history is empty: `sales_agent` (250 categories) and `branch` (150 categories) have 8.33% and 5.00% of rows as a category's first occurrence encoded using only the prior (0.5) versus 0.13%–0.17% for the four lowest-cardinality columns (`customer_segment`, `channel`, `product_family`, `region`, each with 4–5 categories). This is precisely why the two high-cardinality columns are also where naive target encoding leaks the most, since with few observations per category a category's own mean collapses toward individual rows' own labels which is why CatBoost is trained on the raw categorical columns via `cat_features` rather than on either encoding.
+Stratified 80/20 train/test split with `student_seed = 2`. Tuning used 4-fold stratified CV on the training set with ROC-AUC as the objective. The test set was used only once, for the final evaluation.
 
-**Top five features by mean absolute SHAP value**
+### Tuning results
 
-| Rank | Feature | Mean \|SHAP\| |
-|---:|---|---:|
-| 1 | customer_segment | 0.2551 |
-| 2 | channel | 0.1748 |
-| 3 | product_family | 0.1630 |
-| 4 | city | 0.1219 |
-| 5 | monthly_spend | 0.0805 |
+| Method | Best CV ROC-AUC | Configurations / trials evaluated |
+|---|---|---|
+| Grid Search | 0.9504 | 8 |
+| Random Search | 0.9505 | 8 |
+| Bayesian Optimization (Optuna) | 0.9496 | 8 |
 
-**Five largest absolute feature contributions for the selected test observation**
-(test-set row 0, `customer_id` = CUST-02690)
+### Best hyperparameters
 
-| Rank | Feature | SHAP value |
-|---:|---|---:|
-| 1 | customer_segment | -0.2220 |
-| 2 | channel | -0.1637 |
-| 3 | city | +0.1584 |
-| 4 | age | +0.1569 |
-| 5 | monthly_spend | -0.1364 |
+| Method | n_estimators | max_depth | min_samples_split | max_features |
+|---|---|---|---|---|
+| Grid Search | 150 | None | 2 | sqrt |
+| Random Search | 200 | None | 2 | log2 |
+| Bayesian Optimization | 213 | 10 | 2 | log2 |
+
+### Final test-set performance
+
+| Method | Test ROC-AUC | Test F1 |
+|---|---|---|
+| Grid Search | 0.9630 | 0.8598 |
+| Random Search | 0.9651 | 0.8562 |
+| Bayesian Optimization | 0.9601 | 0.8474 |
+
+---
+
+## Problem 3 — Unsupervised Anomaly Detection (PyOD)
+
+Sensor features were standardized (`record_id` excluded). Settings: `contamination = 0.10`, `n_neighbors = 20`, `flag_fraction = 0.10`. Isolation Forest used `n_estimators = 200`, `random_state = 42`.
+
+### Flag counts
+
+| Model | Observations flagged |
+|---|---|
+| KNN | 300 |
+| LOF | 300 |
+| Isolation Forest | 300 |
+
+### Top 10 `record_id` values by anomaly score (most anomalous first)
+
+| Rank | KNN | LOF | Isolation Forest |
+|---|---|---|---|
+| 1 | REC-00035 | REC-00672 | REC-00129 |
+| 2 | REC-00259 | REC-00325 | REC-01247 |
+| 3 | REC-02873 | REC-02855 | REC-00863 |
+| 4 | REC-01662 | REC-00275 | REC-02414 |
+| 5 | REC-00950 | REC-01666 | REC-00049 |
+| 6 | REC-00036 | REC-01794 | REC-01590 |
+| 7 | REC-01369 | REC-02524 | REC-01634 |
+| 8 | REC-01112 | REC-01175 | REC-02386 |
+| 9 | REC-01941 | REC-01229 | REC-02408 |
+| 10 | REC-01065 | REC-01537 | REC-02925 |
+
+### Pairwise overlap of flagged observations
+
+| Pair | Flagged by both |
+|---|---|
+| KNN and LOF | 104 |
+| KNN and Isolation Forest | 189 |
+| LOF and Isolation Forest | 68 |
+
+---
+
+## Problem 4 — Semi-Supervised Anomaly Detection (Pseudo-Labeling)
+
+Subset sizes: 235 labeled, 2140 unlabeled, 625 evaluation rows. Both Random Forests used `n_estimators = 200`, `class_weight = "balanced"`, `random_state = 42`. Pseudo-label thresholds: `low_threshold = 0.10`, `high_threshold = 0.90`. Evaluation labels were not used for training or pseudo-labeling.
+
+### Pseudo-labels added
+
+| Pseudo-normal (label 0) | Pseudo-anomaly (label 1) | Total added |
+|---|---|---|
+| 1390 | 112 | 1502 |
+
+### Evaluation-set results (F1 at probability threshold 0.5)
+
+| Model | ROC-AUC | F1 |
+|---|---|---|
+| Initial (labeled rows only) | 0.9796 | 0.8762 |
+| Retrained (labeled + pseudo-labeled rows) | 0.9765 | 0.8922 |
+
+**Observed result:** pseudo-labeling did not improve every metric. ROC-AUC went down slightly (0.9796 to 0.9765), while F1 went up (0.8762 to 0.8922).
